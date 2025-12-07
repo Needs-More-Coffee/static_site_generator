@@ -7,7 +7,10 @@ from converter import *
 from split import *
 from regexparser import *
 from text_to_text import *
-
+from markdown_block import *
+from block_to_block import *
+from block_to_html import *
+from main import *
 
 class TestHTMLNode(unittest.TestCase):
     def test_formating(self):
@@ -42,22 +45,22 @@ class TestHTMLNode(unittest.TestCase):
 
 class TestTextNode(unittest.TestCase):
     def test_eq(self):
-        node = TextNode("This is a text node", TextType.BOLD)
-        node2 = TextNode("This is a text node", TextType.BOLD)
-        self.assertEqual(node, node2)
+        old_nodes = TextNode("This is a text node", TextType.BOLD)
+        new_nodes = TextNode("This is a text node", TextType.BOLD)
+        self.assertEqual(old_nodes, new_nodes)
     
     def test_noeq(self):
-        node = TextNode("This is a text node", TextType.BOLD)
-        node2 = TextNode("This is a text node", TextType.ITALIC)
-        self.assertNotEqual(node, node2)
+        old_nodes = TextNode("This is a text node", TextType.BOLD)
+        new_nodes = TextNode("This is a text node", TextType.ITALIC)
+        self.assertNotEqual(old_nodes, new_nodes)
 
     def test_invalid_type(self):
         with self.assertRaises(ValueError):
             TextNode("This is a text node", "Not a valid type")
         
     def test_url(self):
-        node = TextNode("Test node", TextType.LINK, "https://example.com")
-        self.assertEqual(node.url, "https://example.com")
+        old_nodes = TextNode("Test node", TextType.LINK, "https://example.com")
+        self.assertEqual(old_nodes.url, "https://example.com")
 
 class TestDelimiter(unittest.TestCase):
     def test_single_bold(self):
@@ -201,6 +204,7 @@ class TestRegexparser(unittest.TestCase):
         self.assertEqual(result, [])
 
 class TestTextToText(unittest.TestCase):
+
     def test_plain_text(self):
         new_nodes = text_to_textnodes("Hello World")
         self.assertListEqual([TextNode("Hello World", TextType.TEXT)], new_nodes)
@@ -255,3 +259,115 @@ class TestTextToText(unittest.TestCase):
             ],
             new_nodes,
         )
+
+class TestBlocks(unittest.TestCase):
+    def test_markdown_to_blocks(self):
+        old_nodes = """
+This is **bolded** paragraph
+
+This is another paragraph with _italic_ text and `code` here
+This is the same paragraph on a new line
+
+- This is a list
+- with items
+"""
+        blocks = markdown_to_blocks(old_nodes)
+        self.assertEqual(
+            blocks,
+            [
+                "This is **bolded** paragraph",
+                "This is another paragraph with _italic_ text and `code` here\nThis is the same paragraph on a new line",
+                "- This is a list\n- with items",
+            ],
+        )
+
+class TestBlockToBlock(unittest.TestCase):
+    def test_heading(self):
+        self.assertEqual(
+            block_to_block_type("# Heading"),
+            BlockType.HEADING
+            )
+
+    def test_code(self):
+        self.assertEqual(
+            block_to_block_type("```\ncode here\n```"),
+            BlockType.CODE
+            )
+
+    def test_quote(self):
+        self.assertEqual(
+            block_to_block_type("> line1\n> line2"),
+            BlockType.QUOTE
+            ) 
+
+    def test_unordered(self):
+        self.assertEqual(
+            block_to_block_type("- item1\n- item2"),
+            BlockType.UNORDERED_LIST
+            )
+
+    def test_ordered(self):
+        self.assertEqual(
+            block_to_block_type("1. a\n2. b\n3. c"),
+            BlockType.ORDERED_LIST
+            )
+        
+    def test_ordered_missing(self):
+        self.assertNotEqual(
+            block_to_block_type("1. a\n3. c"),
+            BlockType.ORDERED_LIST
+            )
+        
+    def test_paragraph(self):
+        self.assertEqual(
+            block_to_block_type("This is a paragraph."),
+            BlockType.PARAGRAPH
+            )
+
+class TestBlocToHTML(unittest.TestCase):
+    def test_paragraphs(self):
+        new_nodes = """
+        This is **bolded** paragraph
+        text in a p
+        tag here
+
+        This is another paragraph with _italic_ text and `code` here
+
+        """
+        node = markdown_to_html_node(new_nodes)
+        html = node.to_html()
+        self.assertEqual(html, "<div><p>This is <b>bolded</b> paragraph text in a p tag here</p><p>This is another paragraph with <i>italic</i> text and <code>code</code> here</p></div>",)
+
+    def test_codeblock(self):
+        new_nodes = """
+        ```
+        This is text that _should_ remain
+        the **same** even with inline stuff
+        ```
+        """
+        node = markdown_to_html_node(new_nodes)
+        html = node.to_html()
+        self.assertEqual(html, "<div><pre><code>This is text that _should_ remain\nthe **same** even with inline stuff\n</code></pre></div>",)
+
+class TestExtraction(unittest.TestCase):
+    def test_simple_title(self):
+        new_nodes = "# Hello"
+        self.assertEqual(extract_title(new_nodes), "Hello")
+
+    def test_title_with_whitespace(self):
+        new_nodes = "   #   My Title   "
+        self.assertEqual(extract_title(new_nodes), "My Title")
+
+    def test_title_in_later_line(self):
+        new_nodes = """
+        Some intro text
+        # Real Title
+        More text
+        """
+        self.assertEqual(extract_title(new_nodes), "Real Title")
+
+    def test_missing_title(self):
+        new_nodes = "## Not a title"
+        with self.assertRaises(ValueError):
+            extract_title(new_nodes)
+
