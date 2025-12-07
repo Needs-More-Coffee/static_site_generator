@@ -16,7 +16,7 @@ from block_to_html import *
 def main():
     basepath = sys.argv[1] if len(sys.argv) > 1 else "/"
     copy_static("static", "docs")
-    generate_pages_recursive("content", "template.html", "docs", basepath)
+    generate_pages_recursive("content", "template.html", "public", basepath)
 
 def copy_static(src, dst):
     if os.path.exists(dst):
